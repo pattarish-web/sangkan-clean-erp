@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim AS base
+FROM node:22-bookworm-slim AS base
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ openssl ca-certificates \
@@ -9,7 +9,8 @@ WORKDIR /app
 FROM base AS deps
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# ข้าม postinstall (prisma generate) เพราะยังไม่มี source เต็ม — generate ในขั้น builder
+RUN npm ci --ignore-scripts
 
 FROM base AS builder
 
