@@ -1,0 +1,103 @@
+# =============================================================================
+# Sangkan Clean — คู่มือสมัคร + Deploy บน Google Cloud (ฟรี e2-micro)
+# =============================================================================
+
+## ส่วนที่ 1: สมัคร Google Cloud (ทำบนเว็บ — ครั้งเดียว)
+
+1. เปิด https://cloud.google.com/free
+2. กด "Get started for free" / เริ่มใช้งานฟรี
+3. Login ด้วย Gmail
+4. กรอกข้อมูล + ผูกบัตร (ไม่หักเงินถ้าอยู่ในขอบฟรี)
+5. รอสร้างบัญชีเสร็จ (ได้ $300 credit ทดลอง 30 วัน — เราใช้แค่ Always Free)
+
+## ส่วนที่ 2: สร้าง VM (ทำบนเว็บ)
+
+1. ไปที่ https://console.cloud.google.com/compute/instances
+2. กด "CREATE INSTANCE" / สร้างอินสแตนซ์
+
+   ตั้งค่าสำคัญ:
+   - Name: sangkan-clean
+   - Region: us-central1 หรือ us-west1 หรือ us-east1  (ต้องเป็น region ฟรี!)
+   - Zone: ใดก็ได้ใน region นั้น เช่น us-central1-a
+   - Machine type: E2 → e2-micro (0.25-2 vCPU, 1 GB memory) — ฟรี
+   - Boot disk: Ubuntu 22.04 LTS, 30 GB (อย่าเกิน 30GB standard)
+   - Firewall: ติ๊ก "Allow HTTP traffic" และ "Allow HTTPS traffic"
+   - กด Advanced options > Networking > Network tags
+     เพิ่ม tag: sangkan-app
+
+3. กด CREATE — รอ 1-2 นาที
+4. จด External IP ที่หน้า VM instances (เช่น 34.xxx.xxx.xxx)
+
+## ส่วนที่ 3: เปิด Firewall port 3000 (ทำบนเว็บ)
+
+1. ไปที่ https://console.cloud.google.com/networking/firewalls
+2. กด "CREATE FIREWALL RULE"
+   - Name: allow-sangkan-3000
+   - Targets: Specified target tags → sangkan-app
+   - Source IPv4 ranges: 0.0.0.0/0
+   - Protocols and ports: tcp:3000
+3. กด CREATE
+
+(ถ้ามีโดเมนและใช้ HTTPS ภายหลัง: เพิ่ม tcp:80, tcp:443 ด้วย)
+
+## ส่วนที่ 4: SSH เข้า VM
+
+วิธีง่าย (ในเว็บ):
+1. หน้า VM instances → กดปุ่ม SSH ข้างชื่อเครื่อง
+2. เปิด terminal ใน browser
+
+วิธีจาก Windows (ถ้าติดตั้ง gcloud แล้ว):
+   gcloud compute ssh sangkan-clean --zone=us-central1-a
+
+## ส่วนที่ 5: Deploy แอพ (รันบน VM — คำสั่งเดียว)
+
+ใน SSH terminal:
+
+   sudo apt-get update && sudo apt-get install -y git
+   git clone https://github.com/YOUR_USER/sangkan-clean.git
+   cd sangkan-clean
+   bash scripts/gcp-first-deploy.sh
+
+ถ้า Docker เพิ่งติดตั้ง ให้รัน newgrp docker แล้วรันคำสั่ง deploy อีกครั้ง
+
+## ส่วนที่ 6: ทดสอบ
+
+เปิดเบราว์เซอร์:
+   http://EXTERNAL-IP:3000
+
+Login:
+   รหัส: SKC0001
+   รหัสผ่าน: 5678
+
+## อัปเดตหลังแก้โค้ด
+
+บนเครื่องคุณ: git push
+
+บน VM:
+   cd ~/sangkan-clean && bash scripts/gcp-update.sh
+
+## งบประมาณ / ไม่ให้โดนหักเงิน
+
+- ใช้แค่ e2-micro ใน us-central1 / us-west1 / us-east1
+- อย่าสร้าง VM ตัวใหญ่กว่า e2-micro
+- ตั้ง Budget Alert: Billing > Budgets > สร้างแจ้งเตือนที่ $1
+- อย่าเปิด service อื่นที่เสียเงิน
+
+## ปัญหาที่พบบ่อย
+
+เปิด IP:3000 ไม่ได้
+  → ตรวจ firewall rule tcp:3000 + tag sangkan-app บน VM
+
+Docker permission denied
+  → newgrp docker แล้วรัน deploy ใหม่
+
+ช้า
+  → ปกติสำหรับ e2-micro ครั้งแรก build ใช้เวลา 5-10 นาที
+
+## มีโดเมนแล้ว (HTTPS — ทำทีหลังได้)
+
+   cp .env.production.example .env
+   nano .env   # ใส่ DOMAIN และ ACME_EMAIL
+   docker compose up -d --build
+
+ชี้ DNS A record โดเมน → External IP ของ VM

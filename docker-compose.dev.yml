@@ -1,0 +1,19 @@
+# ใช้เมื่อยังไม่มีโดเมน — เปิดแค่ port 3000 โดยตรง (ทดสอบบน VPS)
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: file:/data/prod.db
+    volumes:
+      - sangkan_data:/data
+
+volumes:
+  sangkan_data:

@@ -1,0 +1,45 @@
+{
+  "name": "sangkan-clean",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint",
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "node --import tsx scripts/seed.mjs",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d --build",
+    "docker:up:simple": "docker compose -f docker-compose.dev.yml up -d --build",
+    "docker:logs": "docker compose logs -f app",
+    "docker:down": "docker compose down",
+    "vps:setup": "bash scripts/oracle-vps-setup.sh",
+    "vps:deploy": "bash scripts/vps-first-deploy.sh",
+    "vps:update": "bash scripts/vps-update.sh",
+    "gcp:deploy": "bash scripts/gcp-first-deploy.sh",
+    "gcp:update": "bash scripts/gcp-update.sh"
+  },
+  "prisma": {
+    "seed": "node --import tsx scripts/seed.mjs"
+  },
+  "dependencies": {
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "better-sqlite3": "^12.6.2",
+    "lucide-react": "^1.23.0",
+    "next": "16.2.10",
+    "next-auth": "^4.24.14",
+    "prisma": "^7.8.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0"
+  }
+}
