@@ -9,8 +9,11 @@ WORKDIR /app
 FROM base AS deps
 
 COPY package.json package-lock.json ./
-# ข้าม postinstall (prisma generate) เพราะยังไม่มี source เต็ม — generate ในขั้น builder
-RUN npm ci --ignore-scripts
+COPY prisma ./prisma
+COPY prisma.config.ts ./prisma.config.ts
+ENV DATABASE_URL="file:./prisma/dev.db"
+# มี prisma schema แล้ว จึงรัน postinstall (prisma generate) + native build ได้
+RUN npm ci
 
 FROM base AS builder
 
