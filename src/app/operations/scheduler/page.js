@@ -37,18 +37,7 @@ export default function BigCleaningScheduler() {
 
         // โหลดนัดหมายจาก Database
         const savedEvents = await fetchData('BigcleanSchedule');
-        if (savedEvents.length > 0) {
-          setEvents(savedEvents);
-        } else {
-          const mock = [
-            { id: 'BC001', projectId: 'QT202607001', projectName: 'บริการ Big Cleaning คอนโด', customer: 'โรงแรม แกรนด์ พาราดลย์', date: '2026-07-06', team: 'ทีมปฏิบัติการ A', days: 1 },
-            { id: 'BC002', projectId: 'QT202607002', projectName: 'บริการขัดล้างพื้นหินและเช็ดกระจกสูง', customer: 'บจก. อัลฟ่า เทค', date: '2026-07-15', team: 'ทีมปฏิบัติการ B', days: 2 },
-          ];
-          setEvents(mock);
-          for (const event of mock) {
-            await saveData('BigcleanSchedule', event);
-          }
-        }
+        setEvents(savedEvents || []);
       } catch (e) {
         console.error(e);
       }

@@ -30,8 +30,10 @@ export default function Home() {
         fetchData('operations_bigcleaning')
       ]);
 
-      // 2. Calculate revenue (sum of paid invoices or approved quotations if no invoices)
-      const rev = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+      // 2. Calculate revenue (paid invoices only)
+      const rev = invoices
+        .filter((inv) => inv.status === 'paid')
+        .reduce((sum, inv) => sum + (inv.total || inv.price || 0), 0);
 
       // 3. Calculate active jobs
       const activeBc = bcOps.filter(j => j.status === 'กำลังดำเนินการ').length;
@@ -123,14 +125,16 @@ export default function Home() {
           <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--text-main)', margin: '0 0 4px 0' }}>แดชบอร์ดภาพรวม</h1>
           <p style={{ color: 'var(--text-muted)', margin: 0 }}>ภาพรวมความเคลื่อนไหวทางธุรกิจและงานปฏิบัติการวันนี้</p>
         </div>
+        {process.env.NODE_ENV === 'development' && (
         <button 
           onClick={handleResetDatabase}
           style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1', padding: '10px 16px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}
           onMouseEnter={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
           onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
         >
-          <RefreshCw size={16} /> รีเซ็ตข้อมูลตัวอย่าง
+          <RefreshCw size={16} /> รีเซ็ตข้อมูลตัวอย่าง (dev)
         </button>
+        )}
       </div>
 
       {/* Stats Cards */}

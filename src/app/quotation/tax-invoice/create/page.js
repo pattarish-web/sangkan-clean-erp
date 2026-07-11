@@ -3,14 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Save, FileText } from 'lucide-react';
 import Link from 'next/link';
-import { fetchQuotations } from '@/utils/api';
+import { fetchQuotations, fetchInvoices, fetchTaxInvoices, nextSequentialDocId } from '@/utils/api';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toast';
 
 export default function CreateTaxInvoicePage() {
   const router = useRouter();
   const showToast = useToast();
-  const [docNo, setDocNo] = useState('TI202607001');
+  const [docNo, setDocNo] = useState('');
   const [refId, setRefId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
@@ -18,6 +18,7 @@ export default function CreateTaxInvoicePage() {
   const [totalAmount, setTotalAmount] = useState(0);
   const [invoiceAmount, setInvoiceAmount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refNotFound, setRefNotFound] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -25,30 +26,38 @@ export default function CreateTaxInvoicePage() {
       const ref = params.get('ref');
       if (ref) {
         setRefId(ref);
-        setDocNo(ref.replace('QT', 'TI').replace('INV', 'TI'));
         try {
-          const allData = await fetchQuotations();
-          const baseRef = ref.replace('INV', 'QT'); // Just in case it references invoice
-          let found = allData.find(q => q.id === baseRef);
+          const [allData, invoices, taxInvoices] = await Promise.all([
+            fetchQuotations(),
+            fetchInvoices(),
+            fetchTaxInvoices(),
+          ]);
+          setDocNo(nextSequentialDocId('TI', taxInvoices.map((t) => t.id)));
 
-          if (!found) {
-            // Mock data fallback
-            found = {
-              id: baseRef,
-              customer: baseRef === 'QT202607001' ? 'บจก. อัลฟ่า เทค (สำนักงานใหญ่)' : baseRef === 'QT202607002' ? 'โรงแรม แกรนด์ พาราไดซ์' : baseRef === 'QT202607003' ? 'บมจ. เบต้า อินดัสทรี' : 'ลูกค้าตัวอย่าง',
-              address: '123/45 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กทม. 10110',
-              projectName: 'บริการทำความสะอาด',
-              total: baseRef === 'QT202607001' ? 6500 : baseRef === 'QT202607002' ? 12500 : 45000
-            };
-          }
+          const inv = invoices.find((i) => i.id === ref);
+          const baseRef = inv?.refQuotation || ref.replace(/^INV/, 'QT').replace(/^TI/, 'QT');
+          const found = allData.find((q) => q.id === baseRef);
 
-          if (found) {
-            setCustomerName(found.customer || '');
-            setCustomerAddress(found.address || '');
-            setProjectName(found.projectName || '');
-            setTotalAmount(found.total || 0);
-            setInvoiceAmount(found.total || 0);
+          if (!found && !inv) {
+            setRefNotFound(true);
+            showToast(`ไม่พบเอกสารอ้างอิง ${ref}`, 'error');
+          } else {
+            const src = inv || found;
+            setCustomerName(src?.customer || found?.customer || '');
+            setCustomerAddress(src?.address || found?.address || '');
+            setProjectName(src?.projectName || found?.projectName || '');
+            const amt = inv?.total ?? inv?.price ?? found?.total ?? 0;
+            setTotalAmount(amt);
+            setInvoiceAmount(amt);
           }
+        } catch (e) {
+          console.error(e);
+          setRefNotFound(true);
+        }
+      } else {
+        try {
+          const taxInvoices = await fetchTaxInvoices();
+          setDocNo(nextSequentialDocId('TI', taxInvoices.map((t) => t.id)));
         } catch (e) {
           console.error(e);
         }
@@ -59,6 +68,10 @@ export default function CreateTaxInvoicePage() {
   }, []);
 
   const handleSave = async () => {
+    if (refNotFound || !refId) {
+      showToast('ไม่พบใบเสนอราคาอ้างอิง — ไม่สามารถบันทึกได้', 'error');
+      return;
+    }
     const dataToSave = {
       id: docNo,
       date: new Date().toISOString().split('T')[0],
@@ -101,6 +114,11 @@ export default function CreateTaxInvoicePage() {
       </div>
 
       <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '32px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        {refNotFound && (
+          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '16px', marginBottom: '20px', color: '#991b1b' }}>
+            ไม่พบใบเสนอราคาอ้างอิง — ไม่สามารถสร้างเอกสารได้
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>อ้างอิงเอกสาร</label>
@@ -142,7 +160,7 @@ export default function CreateTaxInvoicePage() {
           <button onClick={() => router.back()} style={{ padding: '12px 24px', backgroundColor: 'white', border: '1px solid var(--border-color)', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
             ยกเลิก
           </button>
-          <button onClick={handleSave} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+          <button onClick={handleSave} disabled={refNotFound} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', backgroundColor: refNotFound ? '#94a3b8' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: refNotFound ? 'not-allowed' : 'pointer' }}>
             <Save size={20} /> บันทึกและสร้างเอกสาร
           </button>
         </div>

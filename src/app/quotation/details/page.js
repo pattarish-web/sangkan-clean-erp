@@ -8,17 +8,19 @@ import { useToast } from '@/components/Toast';
 
 export default function QuotationDetails() {
   const showToast = useToast();
-  const [docNo, setDocNo] = useState('QT202607003');
-  const [customerName, setCustomerName] = useState('บมจ. เบต้า อินดัสทรี');
-  const [customerAddress, setCustomerAddress] = useState('88/8 นิคมอุตสาหกรรมเบต้า ชลบุรี 20000');
-  const [customerTaxId, setCustomerTaxId] = useState('01055xxxxxxxx');
-  const [date, setDate] = useState('05 กรกฎาคม 2026');
-  const [items, setItems] = useState([
-    { id: 1, description: 'บริการทำความสะอาดโรงงาน (Big Cleaning) แบบครบวงจร พื้นที่ 1,500 ตรม.', qty: 1, unit: 'งาน', price: 45000 }
-  ]);
+  const [docNo, setDocNo] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [customerTaxId, setCustomerTaxId] = useState('');
+  const [date, setDate] = useState('');
+  const [items, setItems] = useState([]);
 
   const [rawQuotation, setRawQuotation] = useState(null);
   const [showPhotosInPrint, setShowPhotosInPrint] = useState(true);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [userSignature, setUserSignature] = useState('');
+  const [userSignatoryName, setUserSignatoryName] = useState('');
 
   const handlePrintWithoutPhotos = () => {
     setShowPhotosInPrint(false);
@@ -39,27 +41,54 @@ export default function QuotationDetails() {
 
   useEffect(() => {
     async function loadData() {
+      setPageLoading(true);
+      setNotFound(false);
       const params = new URLSearchParams(window.location.search);
       const qid = params.get('id');
-      if (qid) {
-        setDocNo(qid);
+      if (!qid) {
+        setNotFound(true);
+        setPageLoading(false);
+        return;
+      }
+      setDocNo(qid);
+
+      try {
+        const allData = await fetchQuotations();
+        const found = allData.find(q => q.id === qid);
+
+        if (!found) {
+          setNotFound(true);
+          setPageLoading(false);
+          return;
+        }
+
+        setRawQuotation(found);
+        setCustomerName(found.customer || found.customerName || 'ไม่ได้ระบุชื่อลูกค้า');
+        setCustomerAddress(found.address || '');
+        setCustomerTaxId(found.taxId || '');
+        const formattedDate = found.date && found.date.includes('T') ? found.date.split('T')[0] : (found.date || '');
+        setDate(formattedDate);
+        setItems(found.items || []);
+
+        if (params.get('print') === '1') {
+          setTimeout(() => window.print(), 400);
+        }
 
         try {
-          const allData = await fetchQuotations();
-          const found = allData.find(q => q.id === qid);
-          
-          if (found) {
-            setRawQuotation(found);
-            setCustomerName(found.customer || found.customerName || 'ไม่ได้ระบุชื่อลูกค้า');
-            setCustomerAddress(found.address || '');
-            setCustomerTaxId(found.taxId || '');
-            const formattedDate = found.date && found.date.includes('T') ? found.date.split('T')[0] : (found.date || '05 กรกฎาคม 2026');
-            setDate(formattedDate);
-            setItems(found.items || []);
+          const profileRes = await fetch('/api/profile', { cache: 'no-store' });
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            setUserSignature(profile.signature || '');
+            setUserSignatoryName(profile.name || '');
           }
         } catch (e) {
-          console.error("Error fetching data", e);
+          console.error('load signatures', e);
         }
+      } catch (e) {
+        console.error("Error fetching data", e);
+        setNotFound(true);
+      } finally {
+        setPageLoading(false);
       }
     }
     loadData();
@@ -79,13 +108,27 @@ export default function QuotationDetails() {
       await saveQuotation(updated);
       setRawQuotation(updated);
       showToast(newStatus === 'approved' ? 'อนุมัติใบเสนอราคาเรียบร้อยแล้ว' : 'ปฏิเสธใบเสนอราคาเรียบร้อยแล้ว', newStatus === 'approved' ? 'success' : 'warning');
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
     } catch (e) {
       showToast('เกิดข้อผิดพลาดในการบันทึกสถานะ', 'error');
     }
   };
+
+  if (pageLoading) {
+    return (
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '80px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+        กำลังโหลดใบเสนอราคา...
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '80px 16px', textAlign: 'center' }}>
+        <p style={{ color: '#b91c1c', fontWeight: 600, marginBottom: 16 }}>ไม่พบใบเสนอราคาในระบบ</p>
+        <Link href="/quotation" style={{ color: 'var(--primary-color)', fontWeight: 600 }}>← กลับรายการใบเสนอราคา</Link>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', paddingBottom: '60px' }}>
@@ -118,8 +161,8 @@ export default function QuotationDetails() {
               📸 พิมพ์ใบเสนอราคา + รูปสำรวจ
             </button>
           )}
-          <button onClick={() => showToast('กำลังดาวน์โหลดเอกสาร PDF...', 'info')} style={{ backgroundColor: 'var(--primary-color)', color: 'white', border: 'none', padding: '10px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', cursor: 'pointer' }}>
-            <Download size={18} /> ดาวน์โหลด PDF
+          <button onClick={() => window.print()} style={{ backgroundColor: 'var(--primary-color)', color: 'white', border: 'none', padding: '10px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', cursor: 'pointer' }}>
+            <Download size={18} /> พิมพ์ / บันทึก PDF
           </button>
         </div>
       </div>
@@ -230,9 +273,22 @@ export default function QuotationDetails() {
                     <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>วันที่: _____/_____/_____</p>
                   </div>
                   <div style={{ width: '40%' }}>
-                    <div style={{ borderBottom: '1px dashed var(--border-color)', marginBottom: '12px', height: '40px' }}></div>
-                    <p style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 'bold' }}>ผู้มีอำนาจลงนาม / ผู้เสนอราคา (Authorized Signature)</p>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>บริษัท สั่งการ คลีน จำกัด</p>
+                    <div style={{ minHeight: '56px', marginBottom: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+                      {userSignature ? (
+                        <img src={userSignature} alt="รายเซ็นผู้เสนอราคา" style={{ maxHeight: 52, maxWidth: '90%', objectFit: 'contain', marginBottom: 6 }} />
+                      ) : (
+                        <div style={{ borderBottom: '1px dashed var(--border-color)', width: '100%', height: 40, marginBottom: 6 }} />
+                      )}
+                    </div>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 'bold' }}>ผู้เสนอราคา (Quotation Proposer)</p>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      {userSignatoryName || 'บริษัท สั่งการ คลีน จำกัด'}
+                    </p>
+                    {!userSignature && (
+                      <p className="no-print" style={{ margin: '6px 0 0', fontSize: '0.75rem', color: '#0369a1' }}>
+                        <Link href="/profile">ตั้งรายเซ็นที่โปรไฟล์</Link>
+                      </p>
+                    )}
                   </div>
                 </div>
 

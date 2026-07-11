@@ -3,11 +3,21 @@ import { NextResponse } from 'next/server';
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get('q')?.toLowerCase()?.trim() || '';
+    const query = (searchParams.get('q') || searchParams.get('taxId') || '').toLowerCase().trim();
 
     if (!query) {
       return NextResponse.json({ error: 'Query parameter is required' }, { status: 400 });
     }
+
+    const toBranches = (company) => ({
+      branches: [{
+        code: '00000',
+        name: company.name,
+        address: company.address,
+        zip: company.zip || '',
+      }],
+      ...company,
+    });
 
     // ฐานข้อมูลตัวอย่างสำหรับบริษัทที่ผู้ใช้ทดสอบบ่อย (ของจริงตรงตามจดทะเบียน)
     const officialDirectory = {
@@ -79,14 +89,13 @@ export async function GET(request) {
 
     // 1. ตรวจสอบข้อมูลใน Official Directory ตรงๆ (หากมี)
     if (officialDirectory[query]) {
-      return NextResponse.json(officialDirectory[query]);
+      return NextResponse.json(toBranches(officialDirectory[query]));
     }
 
-    // ตรวจสอบจากชื่อคีย์เวิร์ด
     for (const key in officialDirectory) {
       const company = officialDirectory[key];
       if (company.name.toLowerCase().includes(query)) {
-        return NextResponse.json(company);
+        return NextResponse.json(toBranches(company));
       }
     }
 
@@ -161,72 +170,30 @@ export async function GET(request) {
             const fullAddress = addressParts.join(' ').replace(/\s+/g, ' ').trim();
             const fullName = `${title} ${name}`.replace(/\s+/g, ' ').trim();
 
-            return NextResponse.json({
+            return NextResponse.json(toBranches({
               id: `CUS-RD-${query}`,
               name: fullName,
               address: fullAddress,
               taxId: query,
-              phone: '02-' + Math.floor(1000000 + Math.random() * 9000000),
-              email: `billing@${query}.co.th`,
-              contacts: [{ name: 'ฝ่ายบัญชี / ฝ่ายจัดซื้อ', phone: '08' + Math.floor(10000000 + Math.random() * 90000000) }]
-            });
+              zip: postcode || '',
+              contacts: [{ name: 'ฝ่ายบัญชี / ฝ่ายจัดซื้อ', phone: '' }],
+            }));
           }
         }
       } catch (err) {
-        console.error('RD VAT API call failed, falling back to seed generator:', err);
+        console.error('RD VAT API call failed:', err);
       }
 
-      // ระบบสุ่มอิง Seed ของตัวเลขที่ส่งมาเพื่อให้ได้ชื่อผลลัพธ์ข้อมูลเสถียร ไม่มั่วซ้ำซาก (หากระบบค้นหาสรรพากรไม่พบหรือล้มเหลว)
-      const getSeedRandom = (s) => {
-        let h = 0;
-        for (let i = 0; i < s.length; i++) h = Math.abs(s.charCodeAt(i) + ((h << 5) - h));
-        return () => { h = (h * 16807) % 2147483647; return Math.abs((h - 1) / 2147483646); };
-      };
-      
-      const rng = getSeedRandom(query);
-      const firstNames = ['รุ่งเรือง', 'กรุงเทพ', 'ไทยศิริ', 'ทรัพย์ทวี', 'ประสานมิตร', 'เจริญพัฒนา', 'มั่นคง', 'ถาวรกิจ', 'สหการ', 'ก้าวหน้า', 'สยาม', 'อมร', 'ทวีทรัพย์', 'เพชรลดา'];
-      const lastNames = ['คลีนนิ่ง', 'โฮลดิ้งส์', 'เทรดดิ้ง', 'ซัพพลาย', 'วิศวกรรม', 'เคมีคอล', 'บริการ', 'อุตสาหกรรม', 'โลจิสติกส์', 'ฟู้ดส์'];
-      const districts = [
-        { sub: 'แขวงสามเสนใน', dist: 'เขตพญาไท', prov: 'กรุงเทพมหานคร', zip: '10400' },
-        { sub: 'แขวงคลองเตย', dist: 'เขตคลองเตย', prov: 'กรุงเทพมหานคร', zip: '10110' },
-        { sub: 'แขวงลุมพินี', dist: 'เขตปทุมวัน', prov: 'กรุงเทพมหานคร', zip: '10330' },
-        { sub: 'แขวงจตุจักร', dist: 'เขตจตุจักร', prov: 'กรุงเทพมหานคร', zip: '10900' },
-        { sub: 'แขวงบางซื่อ', dist: 'เขตบางซื่อ', prov: 'กรุงเทพมหานคร', zip: '10800' }
-      ];
-
-      const fName = firstNames[Math.floor(rng() * firstNames.length)];
-      const lName = lastNames[Math.floor(rng() * lastNames.length)];
-      const dist = districts[Math.floor(rng() * districts.length)];
-      const houseNo = Math.floor(10 + rng() * 880);
-      const buildingNo = Math.floor(1 + rng() * 99);
-      const fl = Math.floor(2 + rng() * 30);
-
-      return NextResponse.json({
-        id: `CUS-API-${Math.floor(1000 + rng() * 9000)}`,
-        name: `บริษัท ${fName} ${lName} จำกัด (สำนักงานใหญ่)`,
-        address: `เลขที่ ${houseNo}/${buildingNo} อาคารสินธร ชั้น ${fl} ถนนพหลโยธิน ${dist.sub} ${dist.dist} ${dist.prov} ${dist.zip}`,
-        taxId: query,
-        phone: '02-' + Math.floor(1000000 + rng() * 9000000),
-        email: `contact@${fName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company'}.co.th`,
-        contacts: [{ name: 'แผนกจัดซื้อนิติบุคคล', phone: '081-555-6666' }]
-      });
+      return NextResponse.json(
+        { error: 'ไม่พบข้อมูลจากกรมสรรพากร — กรุณากรอกชื่อและที่อยู่เอง' },
+        { status: 404 }
+      );
     }
 
-    // 3. สำหรับการค้นหาด้วยชื่อนิติบุคคลทั่วไป
-    const cleanName = query.replace(/บจก\.|บมจ\.|บริษัท|จำกัด|มหาชน/g, '').trim();
-    const randTax = '01055' + Math.floor(10000000 + Math.random() * 90000000);
-    const randNo = Math.floor(10 + Math.random() * 880);
-    const randFloor = Math.floor(2 + Math.random() * 35);
-
-    return NextResponse.json({
-      id: `CUS-API-${Math.floor(1000 + Math.random() * 9000)}`,
-      name: `บริษัท ${cleanName || 'ตัวอย่าง'} จำกัด (สำนักงานใหญ่)`,
-      address: `เลขที่ ${randNo}/${Math.floor(10 + Math.random()*90)} อาคารรสสุคนธ์ ชั้น ${randFloor} ถนนพหลโยธิน แขวงสามเสนใน เขตพญาไท กรุงเทพมหานคร 10400`,
-      taxId: randTax,
-      phone: `02-` + Math.floor(1000000 + Math.random() * 9000000),
-      email: `info@${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company'}.co.th`,
-      contacts: [{ name: 'แผนกจัดซื้อ / ประสานงานหน้าไซต์', phone: '08' + Math.floor(10000000 + Math.random() * 90000000) }]
-    });
+    return NextResponse.json(
+      { error: 'ไม่พบข้อมูลบริษัท — ลองค้นด้วยเลขประจำตัวผู้เสียภาษี 13 หลัก' },
+      { status: 404 }
+    );
   } catch (error) {
     console.error('API Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

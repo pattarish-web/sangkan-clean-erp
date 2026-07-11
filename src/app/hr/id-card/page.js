@@ -16,26 +16,63 @@ export default function IDCardPreview() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [origin, setOrigin] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  const [qrTokens, setQrTokens] = useState({});
+
+  const loginQrUrl = (emp) => {
+    if (!emp || !origin) return '';
+    const token = qrTokens[emp.id];
+    if (!token) return '';
+    return `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
+      `${origin}/login?token=${token}`
+    )}`;
+  };
+
+  useEffect(() => {
+    async function loadQrToken(empId) {
+      if (!empId || qrTokens[empId]) return;
+      try {
+        const res = await fetch(`/api/auth/qr-token?user=${encodeURIComponent(empId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.token) {
+            setQrTokens((prev) => ({ ...prev, [empId]: data.token }));
+          }
+        }
+      } catch {
+        /* QR optional if not logged in */
+      }
+    }
+    if (selectedEmployee?.id) loadQrToken(selectedEmployee.id);
+  }, [selectedEmployee?.id]);
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
+      setLoadError('');
       try {
-        const emps = await fetchData('Employees');
-        setEmployees(emps || []);
-        
         if (typeof window !== 'undefined') {
           setOrigin(window.location.origin);
-          const params = new URLSearchParams(window.location.search);
-          const urlId = params.get('id');
-          
-          if (emps && emps.length > 0) {
-            const defaultEmp = emps.find(e => e.id === urlId) || emps[0];
-            setSelectedEmployee(defaultEmp);
-            setSelectedEmpId(defaultEmp.id);
-          }
+        }
+        const emps = await fetchData('Employees');
+        const list = Array.isArray(emps) ? emps : [];
+        setEmployees(list);
+
+        const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const urlId = params?.get('id');
+        if (list.length > 0) {
+          const defaultEmp = list.find((e) => e.id === urlId) || list[0];
+          setSelectedEmployee(defaultEmp);
+          setSelectedEmpId(defaultEmp.id);
         }
       } catch (e) {
         console.error(e);
+        setLoadError('โหลดรายชื่อพนักงานไม่สำเร็จ');
+        showToast('โหลดรายชื่อพนักงานไม่สำเร็จ', 'error');
+      } finally {
+        setLoading(false);
       }
     }
     load();
@@ -61,10 +98,29 @@ export default function IDCardPreview() {
     emp.id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (!selectedEmployee && printMode === 'single') {
+  if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 0', color: 'var(--text-muted)' }}>
         <p>กำลังโหลดข้อมูลพนักงาน...</p>
+      </div>
+    );
+  }
+
+  if (loadError || employees.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '80px 24px', color: 'var(--text-muted)' }}>
+        <p style={{ marginBottom: 16 }}>{loadError || 'ยังไม่มีพนักงานในระบบ'}</p>
+        <Link href="/hr/register" style={{ color: 'var(--primary-color)', fontWeight: 700 }}>
+          ไปลงทะเบียนพนักงานใหม่
+        </Link>
+      </div>
+    );
+  }
+
+  if (!selectedEmployee && printMode === 'single') {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 0', color: 'var(--text-muted)' }}>
+        <p>ไม่พบพนักงานที่เลือก</p>
       </div>
     );
   }
@@ -206,7 +262,7 @@ export default function IDCardPreview() {
                 <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Scan for Auto Login</span>
                 <div style={{ width: '85px', height: '85px', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: '1.5px solid #fbbf24', padding: '4px', overflow: 'hidden', boxShadow: '0 4px 8px rgba(0,0,0,0.05)' }}>
                   <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`${origin}/login?user=${selectedEmployee.id}&pass=${selectedEmployee.password || 'sc1234'}`)}`} 
+                    src={loginQrUrl(selectedEmployee)} 
                     alt="Login QR" 
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                   />
@@ -279,7 +335,7 @@ export default function IDCardPreview() {
                     <span style={{ fontSize: '8px', fontWeight: 'bold', color: '#0f172a', textTransform: 'uppercase' }}>Scan for Auto Login</span>
                     <div style={{ width: '70px', height: '70px', backgroundColor: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', border: '1px solid #fbbf24', padding: '3px', overflow: 'hidden' }}>
                       <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`${origin}/login?user=${emp.id}&pass=${emp.password || 'sc1234'}`)}`} 
+                        src={loginQrUrl(emp)} 
                         alt="Login QR" 
                         style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                       />

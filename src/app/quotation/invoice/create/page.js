@@ -3,14 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Save, FileText } from 'lucide-react';
 import Link from 'next/link';
-import { fetchQuotations } from '@/utils/api';
+import { fetchQuotations, fetchInvoices, nextSequentialDocId } from '@/utils/api';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toast';
 
 export default function CreateInvoicePage() {
   const router = useRouter();
   const showToast = useToast();
-  const [docNo, setDocNo] = useState('INV202607001');
+  const [docNo, setDocNo] = useState('');
   const [refId, setRefId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
@@ -18,6 +18,7 @@ export default function CreateInvoicePage() {
   const [totalAmount, setTotalAmount] = useState(0);
   const [invoiceAmount, setInvoiceAmount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refNotFound, setRefNotFound] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -25,23 +26,15 @@ export default function CreateInvoicePage() {
       const ref = params.get('ref');
       if (ref) {
         setRefId(ref);
-        setDocNo(ref.replace('QT', 'INV'));
         try {
-          const allData = await fetchQuotations();
-          let found = allData.find(q => q.id === ref);
+          const [allData, invoices] = await Promise.all([fetchQuotations(), fetchInvoices()]);
+          setDocNo(nextSequentialDocId('INV', invoices.map((i) => i.id)));
+          const found = allData.find(q => q.id === ref);
 
           if (!found) {
-            // Mock data fallback
-            found = {
-              id: ref,
-              customer: ref === 'QT202607001' ? 'บจก. อัลฟ่า เทค (สำนักงานใหญ่)' : ref === 'QT202607002' ? 'โรงแรม แกรนด์ พาราไดซ์' : ref === 'QT202607003' ? 'บมจ. เบต้า อินดัสทรี' : 'ลูกค้าตัวอย่าง',
-              address: '123/45 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กทม. 10110',
-              projectName: 'บริการทำความสะอาด',
-              total: ref === 'QT202607001' ? 6500 : ref === 'QT202607002' ? 12500 : 45000
-            };
-          }
-
-          if (found) {
+            setRefNotFound(true);
+            showToast(`ไม่พบใบเสนอราคา ${ref}`, 'error');
+          } else {
             setCustomerName(found.customer || '');
             setCustomerAddress(found.address || '');
             setProjectName(found.projectName || '');
@@ -50,6 +43,7 @@ export default function CreateInvoicePage() {
           }
         } catch (e) {
           console.error(e);
+          setRefNotFound(true);
         }
       }
       setLoading(false);
@@ -58,6 +52,10 @@ export default function CreateInvoicePage() {
   }, []);
 
   const handleSave = async () => {
+    if (refNotFound || !refId) {
+      showToast('ไม่พบใบเสนอราคาอ้างอิง — ไม่สามารถบันทึกได้', 'error');
+      return;
+    }
     const dataToSave = {
       id: docNo,
       date: new Date().toISOString().split('T')[0],
@@ -100,6 +98,11 @@ export default function CreateInvoicePage() {
       </div>
 
       <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '32px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        {refNotFound && (
+          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '16px', marginBottom: '20px', color: '#991b1b' }}>
+            ไม่พบใบเสนอราคาอ้างอิง — ไม่สามารถสร้างเอกสารได้
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>อ้างอิงใบเสนอราคา</label>
@@ -141,7 +144,7 @@ export default function CreateInvoicePage() {
           <button onClick={() => router.back()} style={{ padding: '12px 24px', backgroundColor: 'white', border: '1px solid var(--border-color)', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
             ยกเลิก
           </button>
-          <button onClick={handleSave} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+          <button onClick={handleSave} disabled={refNotFound} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', backgroundColor: refNotFound ? '#94a3b8' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: refNotFound ? 'not-allowed' : 'pointer' }}>
             <Save size={20} /> บันทึกและสร้างเอกสาร
           </button>
         </div>

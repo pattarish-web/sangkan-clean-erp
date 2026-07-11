@@ -4,13 +4,13 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { QrCode, KeyRound, User, Lock, ArrowRight, Loader } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/Toast';
-import '../globals.css';
 
 async function loginRequest(user, pass) {
   const res = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: user, password: pass }),
+    credentials: 'include',
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -35,23 +35,37 @@ function LoginPageContent() {
   };
 
   useEffect(() => {
+    const tokenParam = searchParams.get('token');
     const userParam = searchParams.get('user');
     const passParam = searchParams.get('pass');
 
-    if (userParam && passParam) {
-      setUsername(userParam);
-      setPassword(passParam);
+    if (tokenParam) {
       setIsLoggingIn(true);
-
-      loginRequest(userParam, passParam)
+      fetch('/api/auth/qr-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tokenParam }),
+        credentials: 'include',
+      })
+        .then(async (res) => {
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error);
+          return data.employee;
+        })
         .then((emp) => {
           showToast(`📲 เข้าสู่ระบบอัตโนมัติด้วย QR Code ของพนักงานรหัส ${emp.id} สำเร็จ!`, 'success');
           redirectAfterLogin();
         })
         .catch(() => {
           setIsLoggingIn(false);
-          showToast('รหัสพนักงานหรือรหัสผ่านไม่ถูกต้อง', 'error');
+          showToast('QR Code ไม่ถูกต้องหรือหมดอายุ', 'error');
         });
+      return;
+    }
+
+    if (userParam && passParam) {
+      showToast('ลิงก์เข้าสู่ระบบแบบเก่าไม่รองรับแล้ว — กรุณาสแกน QR Code บนบัตรพนักงาน', 'warning');
+      return;
     }
   }, [searchParams]);
 
@@ -146,9 +160,6 @@ function LoginPageContent() {
           </div>
         )}
 
-        <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          ทดสอบ: SKC0001 / 5678
-        </p>
       </div>
     </div>
   );

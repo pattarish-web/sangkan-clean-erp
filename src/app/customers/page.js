@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Search, Plus, Phone, Star, Users, Building, FileText, X, Loader2, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Phone, Star, Users, Building, FileText, X, Loader2, Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import { fetchCustomers, saveCustomer, deleteData } from '@/utils/api';
 import { useToast } from '@/components/Toast';
@@ -11,6 +11,7 @@ export default function CustomersPage() {
   const showToast = useToast();
   const [customers, setCustomers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedIds, setExpandedIds] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -18,6 +19,10 @@ export default function CustomersPage() {
   const [formData, setFormData] = useState(emptyForm);
   const [availableBranches, setAvailableBranches] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const toggleExpand = (id) => {
+    setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   useEffect(() => {
     loadCustomers();
@@ -56,20 +61,40 @@ export default function CustomersPage() {
     setIsModalOpen(true);
   };
 
-  const handleSearchTaxId = () => {
+  const handleSearchTaxId = async () => {
     if (formData.taxId.length !== 13) return;
     setIsSearchingTax(true);
     setAvailableBranches([]);
-    // จำลองการเรียก API กรมสรรพากร — ในอนาคตเชื่อมจริงได้
-    setTimeout(() => {
-      const mockBranches = [
-        { code: '00000', name: `บริษัท ตัวอย่าง จำกัด (สำนักงานใหญ่)`, address: '123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กทม.', zip: '10110' },
-        { code: '00001', name: `บริษัท ตัวอย่าง จำกัด (สาขาบางนา)`, address: '99/9 ถนนบางนา-ตราด สมุทรปราการ', zip: '10540' },
-      ];
-      setAvailableBranches(mockBranches);
-      setFormData(prev => ({ ...prev, branchCode: mockBranches[0].code, name: mockBranches[0].name, address: mockBranches[0].address, zip: mockBranches[0].zip }));
+    try {
+      const res = await fetch(`/api/customer-lookup?q=${encodeURIComponent(formData.taxId)}`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const branches = data.branches?.length
+          ? data.branches
+          : data.name
+            ? [{ code: '00000', name: data.name, address: data.address, zip: data.zip || '' }]
+            : [];
+        if (branches.length) {
+          setAvailableBranches(branches);
+          const first = branches[0];
+          setFormData(prev => ({
+            ...prev,
+            branchCode: first.code,
+            name: first.name,
+            address: first.address,
+            zip: first.zip || '',
+          }));
+        } else {
+          showToast('ไม่พบข้อมูล — กรุณากรอกชื่อและที่อยู่เอง', 'warning');
+        }
+      } else {
+        showToast(data.error || 'ไม่พบข้อมูลจาก RD — กรุณากรอกชื่อและที่อยู่เอง', 'warning');
+      }
+    } catch (e) {
+      showToast('ค้นหาเลขประจำตัวผู้เสียภาษีไม่สำเร็จ — กรุณากรอกเอง', 'warning');
+    } finally {
       setIsSearchingTax(false);
-    }, 1200);
+    }
   };
 
   const handleSelectBranch = (code) => {
@@ -152,76 +177,209 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(c => (
-                <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)' }}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  {/* ข้อมูลลูกค้า */}
-                  <td style={{ padding: '16px 8px', verticalAlign: 'top' }}>
-                    <div style={{ fontWeight: '600', color: 'var(--text-main)', fontSize: '1.05rem' }}>{c.name}</div>
-                    {c.taxId && <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>เลขผู้เสียภาษี: {c.taxId}</div>}
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '2px' }}>รหัส: {c.id}</div>
-                    {c.phone && (
-                      <div style={{ color: 'var(--primary-color)', fontSize: '0.85rem', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Phone size={13} /> <a href={`tel:${c.phone}`} style={{ textDecoration: 'none', color: 'inherit' }}>{c.phone}</a>
-                      </div>
-                    )}
-                    {c.rating > 0 && (
-                      <div style={{ marginTop: '8px', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                        {[...Array(Math.min(c.rating, 5))].map((_, i) => <Star key={i} size={13} fill="currentColor" />)}
-                      </div>
-                    )}
-                  </td>
+              {filtered.map(c => {
+                const expanded = !!expandedIds[c.id];
+                const contact = c.contacts?.[0];
+                const contactLine = contact
+                  ? `${contact.name}${contact.position ? ` (${contact.position})` : ''}${contact.phone ? ` · ${contact.phone}` : ''}`
+                  : 'ไม่มีผู้ติดต่อ';
+                const addressLine = [c.address, c.zip].filter(Boolean).join(' ') || '-';
 
-                  {/* ผู้ติดต่อ */}
-                  <td style={{ padding: '16px 8px', verticalAlign: 'top' }}>
-                    {c.contacts && c.contacts.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {c.contacts.map((ct, i) => (
-                          <div key={i} style={{ backgroundColor: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                            <div style={{ fontWeight: '500', color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <Users size={14} /> {ct.name}
-                            </div>
-                            {ct.position && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>{ct.position}</div>}
-                            {ct.phone && <div style={{ fontSize: '0.8rem', color: 'var(--primary-color)', marginTop: '4px' }}>{ct.phone}</div>}
+                return (
+                  <tr
+                    key={c.id}
+                    style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: expanded ? '#f8fafc' : 'white' }}
+                  >
+                    {/* ข้อมูลลูกค้า — ย่อ 2 บรรทัด */}
+                    <td style={{ padding: '12px 8px', verticalAlign: 'top' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(c.id)}
+                          title={expanded ? 'ย่อรายละเอียด' : 'ขยายดูเต็ม'}
+                          style={{
+                            marginTop: 2,
+                            border: 'none',
+                            background: expanded ? '#e0f2fe' : '#f1f5f9',
+                            color: expanded ? '#0369a1' : '#64748b',
+                            borderRadius: '6px',
+                            width: 28,
+                            height: 28,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              color: 'var(--text-main)',
+                              fontSize: '1rem',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                            title={c.name}
+                          >
+                            {c.name}
                           </div>
-                        ))}
+                          {!expanded ? (
+                            <div
+                              style={{
+                                color: 'var(--text-muted)',
+                                fontSize: '0.85rem',
+                                marginTop: 4,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {c.id}
+                              {c.phone ? ` · ${c.phone}` : ''}
+                              {c.taxId ? ` · ภาษี ${c.taxId}` : ''}
+                            </div>
+                          ) : (
+                            <div style={{ marginTop: 8 }}>
+                              {c.taxId && (
+                                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 2 }}>
+                                  เลขผู้เสียภาษี: {c.taxId}
+                                </div>
+                              )}
+                              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 2 }}>รหัส: {c.id}</div>
+                              {c.phone && (
+                                <div style={{ color: 'var(--primary-color)', fontSize: '0.85rem', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <Phone size={13} />
+                                  <a href={`tel:${c.phone}`} style={{ textDecoration: 'none', color: 'inherit' }}>{c.phone}</a>
+                                </div>
+                              )}
+                              {c.rating > 0 && (
+                                <div style={{ marginTop: 8, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 2 }}>
+                                  {[...Array(Math.min(c.rating, 5))].map((_, i) => (
+                                    <Star key={i} size={13} fill="currentColor" />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>ไม่มีผู้ติดต่อ</span>
-                    )}
-                  </td>
+                    </td>
 
-                  {/* ที่อยู่ */}
-                  <td style={{ padding: '16px 8px', verticalAlign: 'top', fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
-                    {c.address || '-'}
-                    {c.zip && <div style={{ marginTop: '4px' }}>รหัสไปรษณีย์: {c.zip}</div>}
-                    {c.email && <div style={{ marginTop: '4px', color: 'var(--primary-color)' }}>{c.email}</div>}
-                  </td>
+                    {/* ผู้ติดต่อ */}
+                    <td style={{ padding: '12px 8px', verticalAlign: 'top' }}>
+                      {!expanded ? (
+                        <div
+                          style={{
+                            fontSize: '0.9rem',
+                            color: contact ? 'var(--text-main)' : 'var(--text-muted)',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            lineHeight: 1.45,
+                          }}
+                          title={contactLine}
+                        >
+                          {contactLine}
+                        </div>
+                      ) : c.contacts && c.contacts.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {c.contacts.map((ct, i) => (
+                            <div key={i} style={{ backgroundColor: 'white', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                              <div style={{ fontWeight: 500, color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <Users size={14} /> {ct.name}
+                              </div>
+                              {ct.position && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>{ct.position}</div>}
+                              {ct.phone && <div style={{ fontSize: '0.8rem', color: 'var(--primary-color)', marginTop: 4 }}>{ct.phone}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>ไม่มีผู้ติดต่อ</span>
+                      )}
+                    </td>
 
-                  {/* จัดการ */}
-                  <td style={{ padding: '16px 8px', verticalAlign: 'top', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <button
-                        onClick={() => handleOpenEdit(c)}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 12px', backgroundColor: 'var(--primary-color)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '0.9rem' }}
-                      >
-                        <Edit size={14} /> แก้ไข
-                      </button>
-                      <Link href={`/quotation/create?type=bigcleaning`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 12px', backgroundColor: '#e0f2fe', color: 'var(--primary-dark)', borderRadius: '6px', textDecoration: 'none', fontWeight: '500', fontSize: '0.9rem' }}>
-                        <FileText size={14} /> สร้างใบเสนอ
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(c.id, c.name)}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 12px', backgroundColor: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: '0.9rem' }}
-                      >
-                        <Trash2 size={14} /> ลบ
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    {/* ที่อยู่ */}
+                    <td style={{ padding: '12px 8px', verticalAlign: 'top', fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                      {!expanded ? (
+                        <div
+                          style={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                          title={[addressLine, c.email].filter(Boolean).join(' · ')}
+                        >
+                          {addressLine}
+                          {c.email ? ` · ${c.email}` : ''}
+                        </div>
+                      ) : (
+                        <>
+                          {c.address || '-'}
+                          {c.zip && <div style={{ marginTop: 4 }}>รหัสไปรษณีย์: {c.zip}</div>}
+                          {c.email && <div style={{ marginTop: 4, color: 'var(--primary-color)' }}>{c.email}</div>}
+                        </>
+                      )}
+                    </td>
+
+                    {/* จัดการ */}
+                    <td style={{ padding: '12px 8px', verticalAlign: 'top', textAlign: 'center' }}>
+                      {!expanded ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(c.id)}
+                            style={{ padding: '6px 10px', background: '#f1f5f9', border: '1px solid var(--border-color)', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}
+                          >
+                            ขยาย
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(c)}
+                            style={{ padding: 8, backgroundColor: 'var(--primary-color)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', display: 'flex' }}
+                            title="แก้ไข"
+                          >
+                            <Edit size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(c.id)}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 12px', backgroundColor: '#f1f5f9', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: 6, cursor: 'pointer', fontWeight: 500, fontSize: '0.9rem' }}
+                          >
+                            <ChevronUp size={14} /> ย่อ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(c)}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 12px', backgroundColor: 'var(--primary-color)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 500, fontSize: '0.9rem' }}
+                          >
+                            <Edit size={14} /> แก้ไข
+                          </button>
+                          <Link href={`/quotation/create?type=bigcleaning`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 12px', backgroundColor: '#e0f2fe', color: 'var(--primary-dark)', borderRadius: 6, textDecoration: 'none', fontWeight: 500, fontSize: '0.9rem' }}>
+                            <FileText size={14} /> สร้างใบเสนอ
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(c.id, c.name)}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 12px', backgroundColor: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 500, fontSize: '0.9rem' }}
+                          >
+                            <Trash2 size={14} /> ลบ
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               {filtered.length === 0 && !loading && (
                 <tr>
                   <td colSpan="4" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>

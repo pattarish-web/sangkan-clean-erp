@@ -1,4 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
 
 :root {
   --primary-color: #0ea5e9; /* Light blue */
@@ -50,33 +58,42 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  gap: 12px;
+  padding: 0 16px;
   height: 64px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  overflow-x: auto;
 }
 
 .topbar-logo {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .top-nav {
   display: flex;
-  gap: 4px;
+  flex-wrap: nowrap;
+  gap: 2px;
   align-items: center;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .nav-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 8px 10px;
   border-radius: 6px;
   color: var(--text-muted);
-  font-size: 0.95rem; 
+  font-size: 0.875rem;
   font-weight: 500;
   transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .nav-item:hover, .nav-item.active {
@@ -95,6 +112,8 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .avatar {

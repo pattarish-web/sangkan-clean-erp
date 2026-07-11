@@ -47,3 +47,6 @@ next-env.d.ts
 /prisma/dev.db-journal
 
 /src/generated/prisma
+
+# Keep agent skills in git (machine migration)
+# Do NOT ignore: .agents/skills/ or .cursor/skills/

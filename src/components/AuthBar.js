@@ -10,14 +10,14 @@ export default function AuthBar() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    fetch('/api/auth/session', { cache: 'no-store' })
+    fetch('/api/auth/session', { cache: 'no-store', credentials: 'include' })
       .then((r) => r.json())
       .then((data) => setUser(data))
       .catch(() => setUser(null));
   }, []);
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     router.push('/login');
   };
 
@@ -32,13 +32,22 @@ export default function AuthBar() {
 
   return (
     <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-      <div style={{ textAlign: 'right' }}>
+      <Link
+        href="/profile"
+        style={{ textAlign: 'right', textDecoration: 'none', color: 'inherit' }}
+        title="จัดการบัญชีและรายเซ็น"
+      >
         <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>{user.name}</div>
         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{user.position || user.id}</div>
-      </div>
-      <div className="avatar" style={{ width: '36px', height: '36px', fontSize: '14px', backgroundColor: '#0ea5e9', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      </Link>
+      <Link
+        href="/profile"
+        className="avatar"
+        title="จัดการบัญชีและรายเซ็น"
+        style={{ width: '36px', height: '36px', fontSize: '14px', backgroundColor: '#0ea5e9', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+      >
         {user.name?.charAt(0) || 'A'}
-      </div>
+      </Link>
       <button
         type="button"
         onClick={handleLogout}

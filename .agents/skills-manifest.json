@@ -1,0 +1,20 @@
+{
+  "project": "sangkan-clean",
+  "purpose": "Machine migration manifest for agent skills",
+  "customSkills": [
+    "sangkan-erp-spine",
+    "sangkan-line-ops",
+    "sangkan-seo-content-safety",
+    "sangkan-dual-repo"
+  ],
+  "externalInstall": [
+    "npx skills add vercel-labs/agent-skills --skill vercel-react-best-practices -a cursor -y",
+    "npx skills add wshobson/agents --skill nextjs-app-router-patterns -a cursor -y",
+    "npx skills add AsyrafHussin/agent-skills --skill typescript-react-patterns -a cursor -y",
+    "npx skills add prisma/skills --skill prisma-cli --skill prisma-client-api --skill prisma-database-setup --skill prisma-upgrade-v7 -a cursor -y",
+    "npx skills add https://github.com/ulpi-io/skills --skill docker -a cursor -y",
+    "npx skills add testdino-hq/playwright-skill -a cursor -y"
+  ],
+  "restoreScript": "scripts/restore-agent-skills.ps1",
+  "spec": "docs/superpowers/specs/2026-07-12-erp-spine-redesign-design.md"
+}

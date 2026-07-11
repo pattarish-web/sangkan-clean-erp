@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Settings, Percent, DollarSign, Users, Wrench, ShieldAlert, Check, ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/Toast';
+import { DEFAULT_COMPANY_PROFILE } from '@/lib/company-profile';
 import { fetchSetting, saveSetting } from '@/utils/api';
 
 export default function AdminSettingsPage() {
@@ -23,6 +24,12 @@ export default function AdminSettingsPage() {
   const [vacuumDailyDepreciation, setVacuumDailyDepreciation] = useState(100);
   const [scaffoldDailyDepreciation, setScaffoldDailyDepreciation] = useState(300);
 
+  const [companyName, setCompanyName] = useState(DEFAULT_COMPANY_PROFILE.name);
+  const [companyPhone, setCompanyPhone] = useState(DEFAULT_COMPANY_PROFILE.phone);
+  const [companyTaxId, setCompanyTaxId] = useState(DEFAULT_COMPANY_PROFILE.taxId);
+  const [companyAddress, setCompanyAddress] = useState(DEFAULT_COMPANY_PROFILE.address);
+  const [bankAccNo, setBankAccNo] = useState(DEFAULT_COMPANY_PROFILE.banks[0].accNo);
+
   // โหลดค่าเมื่อเปิดหน้าจอ
   useEffect(() => {
     async function loadSettings() {
@@ -40,6 +47,12 @@ export default function AdminSettingsPage() {
           if (saved.scrubberDailyDepreciation !== undefined) setScrubberDailyDepreciation(saved.scrubberDailyDepreciation);
           if (saved.vacuumDailyDepreciation !== undefined) setVacuumDailyDepreciation(saved.vacuumDailyDepreciation);
           if (saved.scaffoldDailyDepreciation !== undefined) setScaffoldDailyDepreciation(saved.scaffoldDailyDepreciation);
+          const cp = saved.companyProfile || {};
+          if (cp.name) setCompanyName(cp.name);
+          if (cp.phone) setCompanyPhone(cp.phone);
+          if (cp.taxId) setCompanyTaxId(cp.taxId);
+          if (cp.address) setCompanyAddress(cp.address);
+          if (cp.banks?.[0]?.accNo) setBankAccNo(cp.banks[0].accNo);
         }
       } catch (e) {
         console.error('Failed to parse settings', e);
@@ -49,7 +62,14 @@ export default function AdminSettingsPage() {
   }, []);
 
   const handleSave = async () => {
+    let existing = {};
+    try {
+      const saved = await fetchSetting('sangkan_settings');
+      if (saved && typeof saved === 'object') existing = saved;
+    } catch (e) {}
+
     const settings = {
+      ...existing,
       commissionRate: Number(commissionRate),
       minMargin: Number(minMargin),
       maidDailyRate: Number(maidDailyRate),
@@ -61,6 +81,16 @@ export default function AdminSettingsPage() {
       scrubberDailyDepreciation: Number(scrubberDailyDepreciation),
       vacuumDailyDepreciation: Number(vacuumDailyDepreciation),
       scaffoldDailyDepreciation: Number(scaffoldDailyDepreciation),
+      companyProfile: {
+        name: companyName,
+        phone: companyPhone,
+        fax: DEFAULT_COMPANY_PROFILE.fax,
+        taxId: companyTaxId,
+        address: companyAddress,
+        email: DEFAULT_COMPANY_PROFILE.email,
+        defaultBankId: 'KBANK',
+        banks: [{ ...DEFAULT_COMPANY_PROFILE.banks[0], accNo: bankAccNo }],
+      },
     };
 
     try {
@@ -89,6 +119,17 @@ export default function AdminSettingsPage() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+        <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+          <h3 style={{ margin: '0 0 16px 0', fontWeight: 'bold' }}>ข้อมูลบริษัท (แสดงบนเอกสาร)</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div><label style={{ fontSize: '0.85rem' }}>ชื่อบริษัท</label><input value={companyName} onChange={e => setCompanyName(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: 4, border: '1px solid var(--border-color)', borderRadius: 6 }} /></div>
+            <div><label style={{ fontSize: '0.85rem' }}>โทรศัพท์</label><input value={companyPhone} onChange={e => setCompanyPhone(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: 4, border: '1px solid var(--border-color)', borderRadius: 6 }} /></div>
+            <div><label style={{ fontSize: '0.85rem' }}>เลขผู้เสียภาษี</label><input value={companyTaxId} onChange={e => setCompanyTaxId(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: 4, border: '1px solid var(--border-color)', borderRadius: 6 }} /></div>
+            <div><label style={{ fontSize: '0.85rem' }}>เลขบัญชีกสิกร</label><input value={bankAccNo} onChange={e => setBankAccNo(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: 4, border: '1px solid var(--border-color)', borderRadius: 6 }} /></div>
+            <div style={{ gridColumn: '1 / -1' }}><label style={{ fontSize: '0.85rem' }}>ที่อยู่</label><textarea value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} rows={2} style={{ width: '100%', padding: '8px', marginTop: 4, border: '1px solid var(--border-color)', borderRadius: 6 }} /></div>
+          </div>
+        </div>
         
         {/* ส่วนที่ 1: ตั้งค่านโยบายบริษัท */}
         <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>

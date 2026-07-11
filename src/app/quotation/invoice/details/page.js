@@ -4,20 +4,38 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Printer, Download, CreditCard, Edit2, Save, X } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/Toast';
+import { useCompanyProfile } from '@/hooks/useCompanyProfile';
 
 export default function InvoiceDetails() {
   const showToast = useToast();
+  const { profile } = useCompanyProfile();
   const [isEditing, setIsEditing] = useState(false);
-  const [docNo, setDocNo] = useState('INV202607001');
-  const [customerName, setCustomerName] = useState('บจก. อัลฟ่า เทค (สำนักงานใหญ่)');
-  const [customerAddress, setCustomerAddress] = useState('99/9 ถ.สาธรเหนือ แขวงสีลม เขตบางรัก กทม 10500');
-  const [description, setDescription] = useState('ค่าบริการแม่บ้านทำความสะอาดประจำ ประจำเดือนกรกฎาคม 2026 (จำนวน 1 อัตรา)');
-  const [price, setPrice] = useState(6500);
+  const [docNo, setDocNo] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState(0);
+  const [docDate, setDocDate] = useState('');
+  const [status, setStatus] = useState('unpaid');
+  const [notFound, setNotFound] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const dueDateLabel = (() => {
+    if (!docDate) return '—';
+    const d = new Date(docDate);
+    if (Number.isNaN(d.getTime())) return '—';
+    d.setDate(d.getDate() + 30);
+    return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+  })();
 
   useEffect(() => {
     async function loadData() {
       const params = new URLSearchParams(window.location.search);
-      const id = params.get('id') || 'INV202607001';
+      const id = params.get('id');
+      if (!id) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
       setDocNo(id);
 
       try {
@@ -30,13 +48,44 @@ export default function InvoiceDetails() {
           setCustomerAddress(found.address || '');
           setDescription(found.description || found.projectName || '');
           setPrice(found.total ?? found.price ?? 0);
+          setDocDate(found.date || '');
+          setStatus(found.status || 'unpaid');
+        } else {
+          setNotFound(true);
         }
       } catch (e) {
         console.error("Error loading invoice data:", e);
+        setNotFound(true);
+      } finally {
+        setLoading(false);
       }
     }
     loadData();
   }, []);
+
+  const handleMarkPaid = async () => {
+    try {
+      const { fetchInvoices, saveInvoice } = await import('@/utils/api');
+      const allData = await fetchInvoices();
+      const existing = allData.find(inv => inv.id === docNo) || { id: docNo };
+      const paidDate = new Date().toISOString().split('T')[0];
+      await saveInvoice({
+        ...existing,
+        customer: customerName,
+        address: customerAddress,
+        description,
+        total: Number(price) || 0,
+        price: Number(price) || 0,
+        status: 'paid',
+        paidDate,
+      });
+      setStatus('paid');
+      setDocDate(paidDate);
+      showToast('บันทึกการรับชำระเงินและตัดยอดหนี้แล้ว', 'success');
+    } catch (e) {
+      showToast('ไม่สามารถบันทึกการรับชำระได้', 'error');
+    }
+  };
 
   const handleSave = async () => {
     setIsEditing(false);
@@ -62,6 +111,20 @@ export default function InvoiceDetails() {
   const subTotal = Number(price) || 0;
   const vat = subTotal * 0.07;
   const grandTotal = subTotal + vat;
+
+  if (loading) {
+    return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>กำลังโหลด...</div>;
+  }
+
+  if (notFound) {
+    return (
+      <div style={{ maxWidth: '600px', margin: '60px auto', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '1.5rem', marginBottom: '12px' }}>ไม่พบใบแจ้งหนี้</h1>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>เลขที่เอกสารไม่ถูกต้องหรือถูกลบแล้ว</p>
+        <Link href="/quotation/invoice" style={{ color: 'var(--primary-color)', fontWeight: '600' }}>← กลับรายการใบวางบิล</Link>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', paddingBottom: '60px' }}>
@@ -118,16 +181,16 @@ export default function InvoiceDetails() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
                     <img src="/logo.png" alt="Sangkan Clean Logo" style={{ width: '150px', objectFit: 'contain' }} />
                     <div>
-                      <h2 style={{ color: 'var(--primary-dark)', margin: '0 0 8px 0', fontSize: '1.6rem' }}>บริษัท สั่งการ คลีน จำกัด</h2>
-                      <p style={{ margin: '0 0 4px 0', fontSize: '0.95rem', color: 'var(--text-muted)' }}>123 ถ.สุขุมวิท แขวงคลองเตย เขตคลองเตย กทม 10110</p>
-                      <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-muted)' }}>โทร: 02-123-4567 | แท็กซ์: 01055xxxxxxxx</p>
+                      <h2 style={{ color: 'var(--primary-dark)', margin: '0 0 8px 0', fontSize: '1.6rem' }}>{profile.name}</h2>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '0.95rem', color: 'var(--text-muted)' }}>{profile.address}</p>
+                      <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-muted)' }}>โทร: {profile.phone} | เลขผู้เสียภาษี: {profile.taxId}</p>
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '20px' }}>
                     <h1 style={{ fontSize: '1.5rem', color: '#0ea5e9', margin: '0 0 12px 0', maxWidth: '300px', lineHeight: '1.3' }}>ใบวางบิล / ใบแจ้งหนี้ (Invoice)</h1>
                     <p style={{ margin: '0 0 4px 0', fontWeight: 'bold' }}>เลขที่: {docNo}</p>
-                    <p style={{ margin: 0, color: 'var(--text-muted)' }}>วันที่: 06 กรกฎาคม 2026</p>
-                    <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>วันครบกำหนดชำระ: 05 สิงหาคม 2026</p>
+                    <p style={{ margin: 0, color: 'var(--text-muted)' }}>วันที่: {docDate || '—'}</p>
+                    <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>วันครบกำหนดชำระ: {dueDateLabel}</p>
                   </div>
                 </div>
               </td>
@@ -155,7 +218,7 @@ export default function InvoiceDetails() {
                   <div>
                     <h3 style={{ fontSize: '1rem', color: 'var(--text-muted)', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', marginBottom: '12px' }}>เงื่อนไขการวางบิล</h3>
                     <p style={{ margin: '0 0 4px 0', fontSize: '0.9rem' }}><strong>เครดิตการชำระเงิน:</strong> 30 วัน</p>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}><strong>สถานะ:</strong> <span style={{ color: '#0ea5e9', fontWeight: 'bold' }}>รอรับชำระเงิน</span></p>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}><strong>สถานะ:</strong> <span style={{ color: status === 'paid' ? '#10b981' : '#0ea5e9', fontWeight: 'bold' }}>{status === 'paid' ? 'ชำระแล้ว' : 'รอรับชำระเงิน'}</span></p>
                   </div>
                 </div>
 
@@ -216,12 +279,13 @@ export default function InvoiceDetails() {
           </tbody>
         </table>
 
-        {/* Payment Action */}
+        {status !== 'paid' && (
         <div style={{ marginTop: '40px', padding: '24px', backgroundColor: '#f8fafc', borderRadius: '12px', display: 'flex', justifyContent: 'center' }}>
-          <button onClick={() => showToast('ระบบบันทึกการรับชำระเงินและตัดยอดหนี้แล้ว', 'success')} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#0ea5e9', color: 'white', padding: '12px 32px', borderRadius: '8px', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }}>
+          <button onClick={handleMarkPaid} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#0ea5e9', color: 'white', padding: '12px 32px', borderRadius: '8px', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }}>
             <CreditCard size={20} /> บันทึกการรับชำระเงิน (ตัดหนี้สูญ/รับโอน)
           </button>
         </div>
+        )}
       </div>
     </div>
   );

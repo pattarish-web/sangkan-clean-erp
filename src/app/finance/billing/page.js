@@ -13,16 +13,23 @@ export default function FinanceBillingAuditor() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [isPrintMode, setIsPrintMode] = useState(false);
   const [adminSettings, setAdminSettings] = useState({ commissionRate: 10 });
+  const [quotationMap, setQuotationMap] = useState({});
 
   const loadData = async () => {
     try {
       const { fetchData } = await import('@/utils/api');
       const schedules = await fetchData('BigcleanSchedule');
       const execReports = await loadSettingJson('sangkan_execution_reports', {});
+      const quotes = await fetchQuotations();
+      const qMap = {};
+      (quotes || []).forEach((q) => {
+        qMap[q.id] = q;
+      });
+      setQuotationMap(qMap);
 
       const completed = [];
       schedules.forEach(job => {
-        const parsed = execReports[job.id];
+        const parsed = execReports[job.id] || execReports[job.projectId];
         if (parsed && parsed.status === 'completed') {
           completed.push({ ...job, execData: parsed });
         }
@@ -52,11 +59,13 @@ export default function FinanceBillingAuditor() {
     }, 500);
   };
 
-  const handleApproveBilling = async (jobId) => {
+  const handleApproveBilling = async (job) => {
+    const qtId = job.projectId || job.refQuotation || job.id;
     const billingApproved = await loadSettingJson('sangkan_billing_approved', {});
-    billingApproved[jobId] = {
+    billingApproved[qtId] = {
       approvedAt: new Date().toISOString().split('T')[0],
-      status: 'billed'
+      status: 'billed',
+      scheduleId: job.id,
     };
     await saveSettingJson('sangkan_billing_approved', billingApproved);
     showToast('อนุมัติออกเอกสารวางบิลและบันทึกข้อมูลเรียบร้อยแล้ว!', 'success');
@@ -64,7 +73,9 @@ export default function FinanceBillingAuditor() {
 
   // ดึงราคากลางและข้อมูลส่วนต่าง
   const getFinancials = (job) => {
-    const revenue = 15000; // default mock
+    const qtId = job.projectId || job.refQuotation;
+    const qt = qtId ? quotationMap[qtId] : null;
+    const revenue = Number(qt?.total) || Number(job.execData?.quotedTotal) || 0;
     // คำนวณต้นทุนจริง
     const exec = job.execData || {};
     const actLabor = exec.actLabor || 0;
@@ -309,7 +320,7 @@ export default function FinanceBillingAuditor() {
 
             {/* ปุ่มรวมจัดชุดวางบิล */}
             <div style={{ display: 'flex', gap: '12px', borderTop: '1px solid #cbd5e1', paddingTop: '20px' }}>
-              <button onClick={() => handleApproveBilling(selectedJob.id)} style={{ flex: 1, padding: '12px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', fontWeight: 'bold' }}>
+              <button onClick={() => handleApproveBilling(selectedJob)} style={{ flex: 1, padding: '12px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', fontWeight: 'bold' }}>
                 ✓ บันทึกตรวจสอบสำเร็จ
               </button>
               

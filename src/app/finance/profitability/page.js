@@ -139,16 +139,16 @@ export default function ProfitabilityDashboard() {
     
     // หากไม่มีการลงบันทึกต้นทุนจริง ให้มองว่ามีค่าเป็น 0
     const hasLoggedActual = totalActualCost > 0;
-    const actCost = hasLoggedActual ? totalActualCost : estCost; 
-    const actProfit = revenue - actCost;
-    const actMargin = (actProfit / (revenue || 1)) * 100;
+    const actCost = hasLoggedActual ? totalActualCost : 0;
+    const actProfit = hasLoggedActual ? revenue - actCost : null;
+    const actMargin = hasLoggedActual ? (actProfit / (revenue || 1)) * 100 : null;
 
     // ส่วนต่างกำไรจริงเทียบประเมิน
     const variance = hasLoggedActual ? actProfit - estProfit : 0;
 
     // คอมมิชชัน (คำนวณตาม % ของกำไรจริง)
     const commRate = adminSettings.commissionRate || 10;
-    const commission = actProfit > 0 ? (actProfit * (commRate / 100)) : 0;
+    const commission = hasLoggedActual && actProfit > 0 ? (actProfit * (commRate / 100)) : 0;
 
     return {
       isRecurring,
@@ -281,8 +281,12 @@ export default function ProfitabilityDashboard() {
                       <td style={{ padding: '16px', textAlign: 'right', color: 'var(--text-muted)' }}>
                         {m.estProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })} ฿ ({m.estMargin.toFixed(0)}%)
                       </td>
-                      <td style={{ padding: '16px', textAlign: 'right', color: m.actProfit < m.estProfit && m.hasLoggedActual ? '#ef4444' : '#16a34a', fontWeight: 'bold' }}>
-                        {m.actProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })} ฿ ({m.actMargin.toFixed(0)}%)
+                      <td style={{ padding: '16px', textAlign: 'right', color: m.hasLoggedActual && m.actProfit < m.estProfit ? '#ef4444' : m.hasLoggedActual ? '#16a34a' : 'var(--text-muted)', fontWeight: 'bold' }}>
+                        {m.hasLoggedActual ? (
+                          <>{m.actProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })} ฿ ({m.actMargin.toFixed(0)}%)</>
+                        ) : (
+                          <>ยังไม่บันทึกต้นทุนจริง</>
+                        )}
                         {m.hasLoggedActual && (
                           <div style={{ fontSize: '0.75rem', fontWeight: 'normal', color: m.variance >= 0 ? '#16a34a' : '#ef4444' }}>
                             {m.variance >= 0 ? `+${m.variance.toLocaleString()}` : m.variance.toLocaleString()}

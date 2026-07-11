@@ -28,28 +28,27 @@ export default function RegisterEmployee() {
     async function loadNextId() {
       try {
         const emps = await fetchData('Employees');
-        if (emps && emps.length > 0) {
+        const list = Array.isArray(emps) ? emps : [];
+        if (list.length > 0) {
           // ค้นหา ID ที่ขึ้นต้นด้วย SKC แล้วหาลำดับสูงสุด
-          const scNums = emps
-            .map(e => e.id)
-            .filter(id => id && id.startsWith('SKC'))
-            .map(id => parseInt(id.replace('SKC', ''), 10))
-            .filter(n => !isNaN(n));
-          
+          const scNums = list
+            .map((e) => e.id)
+            .filter((id) => id && String(id).startsWith('SKC'))
+            .map((id) => parseInt(String(id).replace(/^SKC/i, ''), 10))
+            .filter((n) => !isNaN(n));
+
           if (scNums.length > 0) {
             const max = Math.max(...scNums);
-            const next = max + 1;
-            setNextId(`SKC${next.toString().padStart(4, '0')}`);
+            setNextId(`SKC${(max + 1).toString().padStart(4, '0')}`);
           } else {
-            // กรณีไม่มีรหัส SKC เลย ให้ใช้จำนวนพนักงานที่มี + 1
-            const count = emps.length;
-            setNextId(`SKC${(count + 1).toString().padStart(4, '0')}`);
+            setNextId(`SKC${(list.length + 1).toString().padStart(4, '0')}`);
           }
         } else {
           setNextId('SKC0001');
         }
       } catch (e) {
         console.error(e);
+        showToast('โหลดรหัสพนักงานถัดไปไม่สำเร็จ — ตรวจสอบอีกครั้ง', 'warning');
       }
     }
     loadNextId();
@@ -106,10 +105,10 @@ export default function RegisterEmployee() {
 
     try {
       await saveData('Employees', newEmp);
-      showToast(`ลงทะเบียนสำเร็จ! รหัสพนักงาน: ${nextId} | รหัสผ่านล็อกอิน: ${empPassword}`, 'success');
+      showToast(`ลงทะเบียนสำเร็จ! รหัสพนักงาน: ${nextId} — รหัสผ่านตั้งตามเบอร์โทร (4 หลักท้าย)`, 'success');
       setTimeout(() => {
-        router.push('/hr/employees');
-      }, 2000);
+        router.push(`/hr/id-card?id=${encodeURIComponent(nextId)}`);
+      }, 1200);
     } catch (err) {
       showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
       setIsSaving(false);
@@ -163,7 +162,7 @@ export default function RegisterEmployee() {
               <div><strong>Username:</strong> <span style={{ color: '#0ea5e9', fontWeight: 'bold' }}>{nextId}</span></div>
               <div><strong>Password:</strong> <span style={{ color: '#10b981', fontWeight: 'bold' }}>{phone ? (phone.replace(/[^0-9]/g, '').slice(-4) || '1234') : 'เลขท้ายเบอร์โทร 4 ตัว'}</span></div>
               <p style={{ fontSize: '0.8rem', margin: '8px 0 0 0', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                💡 รหัสผ่านจะถูกตั้งเป็นเลขท้าย 4 ตัวของเบอร์มือถือโดยอัตโนมัติ เพื่อให้จำง่ายและสแกนเข้าใช้งานได้สะดวกรวดเร็วค่ะ
+                💡 รหัสผ่านจะถูกตั้งเป็นเลขท้าย 4 ตัวของเบอร์มือถือโดยอัตโนมัติ หลังบันทึกระบบจะพาไปหน้าบัตรพนักงานเพื่อพิมพ์/สแกน QR ล็อกอิน
               </p>
             </div>
           </div>

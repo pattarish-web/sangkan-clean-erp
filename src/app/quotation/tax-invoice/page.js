@@ -122,7 +122,7 @@ export default function TaxInvoiceHistory() {
                       }}>
                         {q.status === 'issued' && (
                           <>
-                            <Link href="/under-construction" style={{ display: 'block', padding: '10px 16px', color: 'var(--text-main)', textDecoration: 'none', textAlign: 'left', fontSize: '0.9rem' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-color)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+                            <Link href={`/quotation/credit-note?ref=${q.id}`} style={{ display: 'block', padding: '10px 16px', color: 'var(--text-main)', textDecoration: 'none', textAlign: 'left', fontSize: '0.9rem' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-color)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
                               สร้างใบลดหนี้ / รับคืน
                             </Link>
                             <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '4px 0' }}></div>

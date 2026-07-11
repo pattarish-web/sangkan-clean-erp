@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { seedDatabase } from '@/lib/seed';
+import { getAuthUserId, unauthorizedResponse } from '@/lib/require-auth';
 
 export async function POST() {
+  const uid = await getAuthUserId();
+  if (!uid) return unauthorizedResponse();
   try {
     await prisma.dataRecord.deleteMany();
     await prisma.appSetting.deleteMany();

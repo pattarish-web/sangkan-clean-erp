@@ -22,6 +22,10 @@ export const SEED_DATA = {
       projectName: 'ทำความสะอาดกระจกอาคารสูง 15 ชั้น',
       total: 12500,
       status: 'pending',
+      contactName: 'คุณนลินี (ผู้จัดการโรงแรม)',
+      contactPhone: '083-555-6666',
+      contacts: [{ name: 'คุณนลินี (ผู้จัดการโรงแรม)', phone: '083-555-6666' }],
+      mapUrl: 'https://maps.app.goo.gl/3e6LH8SN2dx1pR1v6',
       items: [
         { id: 1, description: 'งานเช็ดกระจกภายนอกอาคาร (15 ชั้น)', qty: 15, unit: 'ชั้น', price: 800 },
         { id: 2, description: 'งานเช็ดกระจกภายใน', qty: 1, unit: 'งาน', price: 500 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# รันบน Google Cloud VM (Ubuntu) หลัง clone โปรเจกต์
+# รันบน Google Cloud VM (Debian/Ubuntu) หลัง clone โปรเจกต์
 # ใช้: bash scripts/gcp-first-deploy.sh
 set -euo pipefail
 

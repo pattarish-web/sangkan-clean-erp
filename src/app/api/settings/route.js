@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getAuthUserId, unauthorizedResponse } from '@/lib/require-auth';
 
 export async function GET(request) {
+  const uid = await getAuthUserId();
+  if (!uid) return unauthorizedResponse();
+
   try {
     const key = new URL(request.url).searchParams.get('key');
     if (!key) {
@@ -17,6 +21,9 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  const uid = await getAuthUserId();
+  if (!uid) return unauthorizedResponse();
+
   try {
     const body = await request.json();
     const { key, value } = body;

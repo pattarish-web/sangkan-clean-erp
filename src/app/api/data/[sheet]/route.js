@@ -1,8 +1,20 @@
 import { NextResponse } from 'next/server';
 import { prisma, normalizeSheet, recordToObject } from '@/lib/prisma';
 import { seedDatabase } from '@/lib/seed';
+import { getAuthUserId, unauthorizedResponse } from '@/lib/require-auth';
+
+const SENSITIVE_SHEETS = new Set(['employees']);
+
+function sanitizeRecord(sheet, record) {
+  if (sheet === 'employees' && record && typeof record === 'object') {
+    const { password, ...rest } = record;
+    return rest;
+  }
+  return record;
+}
 
 async function ensureSeeded() {
+  if (process.env.NODE_ENV === 'production') return;
   const count = await prisma.dataRecord.count();
   if (count === 0) {
     await seedDatabase();
@@ -11,14 +23,18 @@ async function ensureSeeded() {
 
 export async function GET(_request, context) {
   try {
-    await ensureSeeded();
+    const uid = await getAuthUserId();
+    if (!uid) return unauthorizedResponse();
+
     const { sheet } = await context.params;
     const normalized = normalizeSheet(sheet);
+
+    await ensureSeeded();
     const records = await prisma.dataRecord.findMany({
       where: { sheet: normalized },
       orderBy: { updatedAt: 'desc' },
     });
-    return NextResponse.json(records.map(recordToObject));
+    return NextResponse.json(records.map((r) => sanitizeRecord(normalized, recordToObject(r))));
   } catch (error) {
     console.error('[API GET data]', error);
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 });
@@ -26,6 +42,9 @@ export async function GET(_request, context) {
 }
 
 export async function POST(request, context) {
+  const uid = await getAuthUserId();
+  if (!uid) return unauthorizedResponse();
+
   try {
     const { sheet } = await context.params;
     const normalized = normalizeSheet(sheet);
@@ -57,6 +76,9 @@ export async function POST(request, context) {
 }
 
 export async function DELETE(request, context) {
+  const uid = await getAuthUserId();
+  if (!uid) return unauthorizedResponse();
+
   try {
     const { sheet } = await context.params;
     const normalized = normalizeSheet(sheet);

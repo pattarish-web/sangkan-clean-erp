@@ -38,7 +38,31 @@ export default function CreditNoteHistory() {
   };
 
   useEffect(() => {
-    loadData();
+    async function init() {
+      await loadData();
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      if (!ref) return;
+
+      setRefDoc(ref);
+      setIsModalOpen(true);
+
+      try {
+        const { fetchTaxInvoices, fetchInvoices } = await import('@/utils/api');
+        const [taxInvoices, invoices] = await Promise.all([fetchTaxInvoices(), fetchInvoices()]);
+        const ti = taxInvoices.find((t) => t.id === ref);
+        const inv = invoices.find((i) => i.id === ref);
+        const src = ti || inv;
+        if (src) {
+          if (src.customer) setSelectedCustomer(src.customer);
+          const amt = src.total ?? src.price ?? 0;
+          if (amt) setDocTotal(String(amt));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    init();
   }, []);
 
   const handleCreate = async (e) => {

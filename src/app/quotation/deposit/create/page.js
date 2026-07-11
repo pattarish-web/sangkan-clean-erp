@@ -3,14 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Save, FileText } from 'lucide-react';
 import Link from 'next/link';
-import { fetchQuotations } from '@/utils/api';
+import { fetchQuotations, fetchDeposits, nextSequentialDocId } from '@/utils/api';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toast';
 
 export default function CreateDepositPage() {
   const router = useRouter();
   const showToast = useToast();
-  const [docNo, setDocNo] = useState('DP202607001');
+  const [docNo, setDocNo] = useState('');
   const [refId, setRefId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
@@ -18,6 +18,7 @@ export default function CreateDepositPage() {
   const [totalAmount, setTotalAmount] = useState(0);
   const [depositAmount, setDepositAmount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refNotFound, setRefNotFound] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -25,23 +26,15 @@ export default function CreateDepositPage() {
       const ref = params.get('ref');
       if (ref) {
         setRefId(ref);
-        setDocNo(ref.replace('QT', 'DP'));
         try {
-          const allData = await fetchQuotations();
-          let found = allData.find(q => q.id === ref);
+          const [allData, deposits] = await Promise.all([fetchQuotations(), fetchDeposits()]);
+          setDocNo(nextSequentialDocId('DP', deposits.map((d) => d.id)));
+          const found = allData.find(q => q.id === ref);
 
           if (!found) {
-            // Mock data fallback
-            found = {
-              id: ref,
-              customer: ref === 'QT202607001' ? 'บจก. อัลฟ่า เทค (สำนักงานใหญ่)' : ref === 'QT202607002' ? 'โรงแรม แกรนด์ พาราไดซ์' : ref === 'QT202607003' ? 'บมจ. เบต้า อินดัสทรี' : 'ลูกค้าตัวอย่าง',
-              address: '123/45 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กทม. 10110',
-              projectName: 'บริการทำความสะอาด',
-              total: ref === 'QT202607001' ? 6500 : ref === 'QT202607002' ? 12500 : 45000
-            };
-          }
-
-          if (found) {
+            setRefNotFound(true);
+            showToast(`ไม่พบใบเสนอราคา ${ref} — ไม่สามารถสร้างใบมัดจำได้`, 'error');
+          } else {
             setCustomerName(found.customer || '');
             setCustomerAddress(found.address || '');
             setProjectName(found.projectName || '');
@@ -50,6 +43,7 @@ export default function CreateDepositPage() {
           }
         } catch (e) {
           console.error(e);
+          setRefNotFound(true);
         }
       }
       setLoading(false);
@@ -58,6 +52,10 @@ export default function CreateDepositPage() {
   }, []);
 
   const handleSave = async () => {
+    if (refNotFound || !refId) {
+      showToast('ไม่พบใบเสนอราคาอ้างอิง — ไม่สามารถบันทึกได้', 'error');
+      return;
+    }
     const dataToSave = {
       id: docNo,
       date: new Date().toISOString().split('T')[0],

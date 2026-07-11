@@ -15,7 +15,7 @@ export default function HRLayout({ children }) {
     { name: 'ลงทะเบียนพนักงานใหม่', path: '/hr/register', icon: <UserPlus size={18} /> },
     { type: 'divider' },
     { name: 'ออกบัตรพนักงาน (ID Card)', path: '/hr/id-card', icon: <CreditCard size={18} /> },
-    { name: 'ตรวจสอบเวลาเข้างาน', path: '/under-construction', icon: <UserCheck size={18} /> },
+    { name: 'ตรวจสอบเวลาเข้างาน (เร็วๆ นี้)', path: '#', icon: <UserCheck size={18} />, disabled: true },
   ];
 
   return (
@@ -32,6 +32,15 @@ export default function HRLayout({ children }) {
               return <div key={idx} style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '12px 0' }} />;
             }
             
+            if (item.disabled) {
+              return (
+                <span key={item.path} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '8px', color: 'var(--text-muted)', opacity: 0.6, fontSize: '0.9rem' }}>
+                  {item.icon}
+                  {item.name}
+                </span>
+              );
+            }
+
             const isActive = pathname === item.path || (item.path !== '/hr' && pathname.startsWith(item.path));
             
             return (
